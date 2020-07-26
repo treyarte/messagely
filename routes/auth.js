@@ -4,11 +4,6 @@ const ExpressError = require('../expressError');
 const { SECRET_KEY } = require('../config');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const {
-  authenticateJWT,
-  ensureLoggedIn,
-  ensureCorrectUser,
-} = require('../middleware/auth');
 /** POST /login - login: {username, password} => {token}
  *
  * Make sure to update their last-login!
@@ -16,6 +11,17 @@ const {
  **/
 router.post('/login', async (req, res, next) => {
   try {
+    const { username, password } = req.body;
+    if (!username || !password)
+      throw new ExpressError('Username/Password are required', 400);
+    if (await User.authenticate(username, password)) {
+      User.updateLoginTimestamp(username);
+
+      const token = jwt.sign({ username: username }, SECRET_KEY);
+      return res.json({ token: token });
+    }
+
+    throw new ExpressError('Invalid username/password combination', 400);
   } catch (error) {
     return next(error);
   }
@@ -31,7 +37,7 @@ router.post('/register', async function (req, res, next) {
   try {
     const { username, password, first_name, last_name, phone } = req.body;
     if (!password) throw new ExpressError('password is required', 400);
-    console.log(password);
+
     const user = await User.register({
       username,
       password,
