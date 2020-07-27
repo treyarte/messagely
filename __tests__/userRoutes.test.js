@@ -38,7 +38,13 @@ describe('User Routes Test', function () {
 
   describe('/GET users', () => {
     test('get a list of users', async () => {
-      const resp = await request(app).get('/users');
+      const resp1 = await request(app)
+        .post(`/auth/login`)
+        .send({ username: u2.username, password: 'password' });
+
+      const { token } = resp1.body;
+
+      const resp = await request(app).get('/users').send({ _token: token });
 
       //do not want the password in the get request
       delete u1.password;
@@ -51,7 +57,15 @@ describe('User Routes Test', function () {
 
   describe('/GET :username', () => {
     test('get a single user by username', async () => {
-      const resp = await request(app).get(`/users/${u1.username}`);
+      const resp1 = await request(app)
+        .post(`/auth/login`)
+        .send({ username: u1.username, password: 'password' });
+
+      const { token } = resp1.body;
+
+      const resp = await request(app)
+        .get(`/users/${u1.username}`)
+        .send({ _token: token });
       const user = await User.get(u1.username);
       expect(resp.body).toEqual({
         user: {
@@ -69,7 +83,73 @@ describe('User Routes Test', function () {
     test('return 404 for invalid user', async () => {
       const resp = await request(app).get('/users/noexist');
 
-      expect(resp.statusCode).toBe(404);
+      expect(resp.statusCode).toBe(401);
+    });
+  });
+
+  describe('/GET :username/to', () => {
+    test('get messages that was sent to that user', async () => {
+      const resp1 = await request(app)
+        .post(`/auth/login`)
+        .send({ username: u2.username, password: 'password' });
+
+      const { token } = resp1.body;
+
+      const resp = await request(app)
+        .get(`/users/${u2.username}/to`)
+        .send({ _token: token });
+
+      expect(resp.body).toEqual({
+        messages: [
+          {
+            id: m1.id,
+            body: m1.body,
+            sent_at: expect.any(String),
+            read_at: null,
+            from_user: {
+              username: u1.username,
+              first_name: u1.first_name,
+              last_name: u1.last_name,
+              phone: u1.phone,
+            },
+          },
+        ],
+      });
+
+      expect(resp.statusCode).toBe(200);
+    });
+  });
+
+  describe('/GET :username/from', () => {
+    test('get all messages a user has sent', async () => {
+      const resp1 = await request(app)
+        .post(`/auth/login`)
+        .send({ username: u2.username, password: 'password' });
+
+      const { token } = resp1.body;
+
+      const resp = await request(app)
+        .get(`/users/${u1.username}/from`)
+        .send({ _token: token });
+
+      expect(resp.body).toEqual({
+        messages: [
+          {
+            id: m1.id,
+            body: m1.body,
+            sent_at: expect.any(String),
+            read_at: null,
+            to_user: {
+              username: u2.username,
+              first_name: u2.first_name,
+              last_name: u2.last_name,
+              phone: u2.phone,
+            },
+          },
+        ],
+      });
+
+      expect(resp.statusCode).toBe(200);
     });
   });
 });

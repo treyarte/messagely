@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ExpressError = require('../expressError');
 const User = require('../models/user');
+const { ensureCorrectUser, ensureLoggedIn } = require('../middleware/auth');
 
 /** GET / - get list of users.
  *
@@ -9,7 +10,7 @@ const User = require('../models/user');
  *
  **/
 
-router.get('/', async (req, res, next) => {
+router.get('/', ensureLoggedIn, async (req, res, next) => {
   try {
     const results = await User.all();
     const users = results.map((u) => {
@@ -32,16 +33,21 @@ router.get('/', async (req, res, next) => {
  *
  **/
 
-router.get('/:username', async (req, res, next) => {
-  try {
-    const { username } = req.params;
-    const user = await User.get(username);
-    if (!user) throw new ExpressError('User not found', 404);
-    return res.json({ user: user });
-  } catch (error) {
-    return next(error);
+router.get(
+  '/:username',
+  ensureLoggedIn,
+  ensureCorrectUser,
+  async (req, res, next) => {
+    try {
+      const { username } = req.params;
+      const user = await User.get(username);
+      if (!user) throw new ExpressError('User not found', 404);
+      return res.json({ user: user });
+    } catch (error) {
+      return next(error);
+    }
   }
-});
+);
 
 /** GET /:username/to - get messages to user
  *
@@ -52,6 +58,16 @@ router.get('/:username', async (req, res, next) => {
  *                 from_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
+router.get('/:username/to', ensureLoggedIn, async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const to_messages = await User.messagesTo(username);
+
+    res.json({ messages: to_messages });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 /** GET /:username/from - get messages from user
  *
@@ -62,4 +78,15 @@ router.get('/:username', async (req, res, next) => {
  *                 to_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
+router.get('/:username/from', ensureLoggedIn, async (req, res, next) => {
+  try {
+    const { username } = req.params;
+
+    const messages = await User.messagesFrom(username);
+
+    res.json({ messages });
+  } catch (error) {
+    return next(error);
+  }
+});
 module.exports = router;
